@@ -1,7 +1,9 @@
 """Generates visualizations of cells from the cell database"""
 
-import database as db
-import cellmath
+from matplotlib.cm import ScalarMappable
+
+import utils.database as db
+import utils.cellmath as cellmath
 import numpy as np
 from matplotlib.colors import Normalize
 import matplotlib.pyplot as plt
@@ -53,14 +55,31 @@ def draw_cell_boundaries(ax, frame: int, cell_id_list, hue_vals={}, border_width
 
 
 def calcMax(vals: dict):
-    omega_max = np.nanmax(np.abs(np.array(vals.values())))
-    return omega_max
+    return np.nanmax(np.abs(np.array(list(vals.values()), dtype=np.float32)))
 
 
 def getColor(val, max_val, cmap_color="coolwarm"):
     norm = Normalize(-max_val, max_val)
-    cmap = plt.get_cmap("coolwarm")
+    cmap = plt.get_cmap(cmap_color)
+
     return cmap(norm(val))
+
+
+def plotColorBar(
+    ax, fig, hue_vals: dict, normalize: bool, label, cmap_color="coolwarm"
+):
+    max_val = calcMax(hue_vals)
+    cmap = plt.get_cmap(cmap_color)
+
+    if normalize:
+        norm = Normalize(-max_val, max_val)
+        scalar_mappable = ScalarMappable(norm=norm, cmap=cmap)
+    else:
+        scalar_mappable = ScalarMappable(cmap=cmap)
+
+    scalar_mappable.set_array(list(hue_vals.values()))
+    colorbar = fig.colorbar(scalar_mappable, ax=ax, fraction=0.046, pad=0.04)
+    colorbar.set_label(label)
 
 
 if __name__ == "__main__":
