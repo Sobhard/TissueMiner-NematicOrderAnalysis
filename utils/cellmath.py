@@ -54,6 +54,7 @@ def shoelace_area(vertices):
 
 
 def find_center(vertices):
+    # Add formula for this function (make documentation)
     area = 0
     x_center = 0
     y_center = 0
