@@ -283,6 +283,18 @@ def calc_local_hexatic_order(cell_id, dbonds_data, vertices_data):
     return np.sqrt(real_sum**2 + imaginary_sum**2)
 
 
+def weighted_order_dict(nematic_order_dict, aspect_ratio_dict):
+    avg_aspect_ratio = np.mean(list(aspect_ratio_dict.values()))
+    weighted_order_dict = dict()
+
+    for cell_id, n_order in nematic_order_dict.items():
+        weighted_order_dict[cell_id] = (
+            aspect_ratio_dict[cell_id] * n_order / avg_aspect_ratio
+        )
+
+    return weighted_order_dict
+
+
 def local_hexatic_order_dict(cell_data, dbonds_data, vertices_data):
     hexatic_orders = {}
 

@@ -33,6 +33,7 @@ class SeriesKeys(StrEnum):
     ASPECT_RATIO = "aspect_ratio"
     NEMATIC_ORDER = "nematic_order"
     HEXATIC_ORDER = "hexatic_order"
+    OMEGA = "weighted_nematic_order"
 
 
 # Agregate frame data into a .csv file for easy analytics
@@ -53,6 +54,7 @@ if not index_path.exists():
             frame_data[Tables.DBONDS],
             frame_data[Tables.VERTICES],
             2,
+            use_reference=False,
         )
 
         hexatic_orders = cellmath.order_dict(
@@ -60,6 +62,7 @@ if not index_path.exists():
             frame_data[Tables.DBONDS],
             frame_data[Tables.VERTICES],
             6,
+            use_reference=False,
         )
 
         aspect_ratios = cellmath.aspect_ratio_dict(
@@ -67,6 +70,8 @@ if not index_path.exists():
             frame_data[Tables.DBONDS],
             frame_data[Tables.VERTICES],
         )
+
+        omegas = cellmath.weighted_order_dict(nematic_orders, aspect_ratios)
 
         frame_data[Tables.CELLS][SeriesKeys.ASPECT_RATIO] = frame_data[Tables.CELLS][
             SeriesKeys.CELL_ID
@@ -80,12 +85,73 @@ if not index_path.exists():
             SeriesKeys.CELL_ID
         ].map(hexatic_orders)
 
+        frame_data[Tables.CELLS][SeriesKeys.OMEGA] = frame_data[Tables.CELLS][
+            SeriesKeys.CELL_ID
+        ].map(omegas)
+
         tmp_index[i] = frame_data
 
     with open(index_path, "wb") as f:
         pickle.dump(tmp_index, f)
 
 index: dict[int, pd.DataFrame] = pd.read_pickle(index_path)
-timestamps: dict[str, pd.DataFrame] = db.get_timestamps(db.get_database_path())
+timestamps: pd.Series = db.get_timestamps(db.get_database_path())["timestamps"][
+    "time_sec"
+][1:]
 
 # CREATING THE ORDER VS TIME PLOTS
+average_nematic_orders = []
+
+for frame_data in index.values():
+    mean_nematic = np.mean(frame_data[Tables.CELLS][SeriesKeys.NEMATIC_ORDER][1:])
+    average_nematic_orders.append(mean_nematic)
+
+average_aspect_ratios = []
+
+for frame_data in index.values():
+    mean_aspect = np.mean(frame_data[Tables.CELLS][SeriesKeys.ASPECT_RATIO][1:])
+    average_aspect_ratios.append(mean_aspect)
+
+average_hexatic_orders = []
+
+for frame_data in index.values():
+    mean_hexatic = np.mean(frame_data[Tables.CELLS][SeriesKeys.HEXATIC_ORDER][1:])
+    average_hexatic_orders.append(mean_hexatic)
+
+average_omegas = []
+
+for frame_data in index.values():
+    mean_omega = np.mean(frame_data[Tables.CELLS][SeriesKeys.OMEGA][1:])
+    average_omegas.append(mean_omega)
+
+fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 8), sharex=True)
+
+# --- Nematic Order ---
+ax1.plot(timestamps, average_nematic_orders)
+ax1.set_title("Average Nematic Order vs. Time")
+ax1.set_ylabel("Nematic Order")
+ax1.grid(True)
+
+# --- Aspect Ratio ---
+ax2.plot(timestamps, average_aspect_ratios)
+ax2.set_title("Average Aspect Ratio vs. Time")
+ax2.set_ylabel("Aspect Ratio")
+ax2.grid(True)
+
+# --- Hexatic Order ---
+ax3.plot(timestamps, average_hexatic_orders)
+ax3.set_title("Average Hexatic Order vs. Time")
+ax3.set_xlabel("Time (s)")
+ax3.set_ylabel("Hexatic Order")
+ax3.grid(True)
+
+# ---  OMEGAS ---
+ax4.plot(timestamps, average_omegas)
+ax4.set_title("Average Omega vs. Time")
+ax4.set_xlabel("Time (s)")
+ax4.set_ylabel("Weighted Nematic Order")
+ax4.grid(True)
+
+
+plt.tight_layout()
+plt.show()

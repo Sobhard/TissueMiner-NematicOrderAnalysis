@@ -12,7 +12,9 @@ from matplotlib.patches import Polygon
 UNASSIGNED_CELL_ID = 10000
 
 
-def draw_cell_boundaries(ax, frame: int, cell_id_list, hue_vals={}, border_width=0.8):
+def draw_cell_boundaries(
+    ax, frame: int, cell_id_list, hue_vals={}, border_width=0.8, negative_vals=True
+):
     cell_data = db.get_frame(frame, db.get_database_path())
     all_dbonds = cell_data["directed_bonds"]
     all_vertices = cell_data["vertices"]
@@ -39,7 +41,7 @@ def draw_cell_boundaries(ax, frame: int, cell_id_list, hue_vals={}, border_width
         if np.isnan(omega):
             facecolor = "lightgray"
         else:
-            facecolor = getColor(omega, omega_max)
+            facecolor = getColor(omega, omega_max, negatives=negative_vals)
 
         polygon = Polygon(
             cell_points,
@@ -58,24 +60,29 @@ def calcMax(vals: dict):
     return np.nanmax(np.abs(np.array(list(vals.values()), dtype=np.float32)))
 
 
-def getColor(val, max_val, cmap_color="coolwarm"):
-    norm = Normalize(-max_val, max_val)
+def getColor(val, max_val, cmap_color="coolwarm", negatives=True):
+    if negatives:
+        norm = Normalize(-max_val, max_val)
+    else:
+        norm = Normalize(0, max_val)
+
     cmap = plt.get_cmap(cmap_color)
 
     return cmap(norm(val))
 
 
 def plotColorBar(
-    ax, fig, hue_vals: dict, normalize: bool, label, cmap_color="coolwarm"
+    ax, fig, hue_vals: dict, negatives: bool, label, cmap_color="coolwarm"
 ):
     max_val = calcMax(hue_vals)
     cmap = plt.get_cmap(cmap_color)
 
-    if normalize:
+    if negatives:
         norm = Normalize(-max_val, max_val)
-        scalar_mappable = ScalarMappable(norm=norm, cmap=cmap)
     else:
-        scalar_mappable = ScalarMappable(cmap=cmap)
+        norm = Normalize(0, max_val)
+
+    scalar_mappable = ScalarMappable(norm=norm, cmap=cmap)
 
     scalar_mappable.set_array(list(hue_vals.values()))
     colorbar = fig.colorbar(scalar_mappable, ax=ax, fraction=0.046, pad=0.04)
