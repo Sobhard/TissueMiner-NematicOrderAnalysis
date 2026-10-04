@@ -10,6 +10,23 @@ def get_database_path():
     return Path("data/demo.sqlite")
 
 
+def get_frame_count(database_path: Path):
+    print(database_path)
+
+    if str(database_path) == "data/demo.sqlite":
+        return 70
+
+    conn = sqlite3.connect(database_path)
+
+    query = """
+    SELECT frame, MAX(time_sec) FROM timepoints;
+    """
+
+    max_frame = pd.read_sql_query(query, conn)
+
+    return max(max_frame["frame"])
+
+
 def get_frame(frame, database_path):
     """
     Load all data necessary to visualize one frame.
