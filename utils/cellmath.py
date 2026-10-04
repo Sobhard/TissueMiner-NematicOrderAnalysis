@@ -2,7 +2,6 @@
 
 import pandas as pd
 import numpy as np
-from skimage.measure import EllipseModel
 
 
 def get_cell_verticies(cell_id, dbonds_data, vertex_data):
@@ -18,7 +17,7 @@ def get_cell_verticies(cell_id, dbonds_data, vertex_data):
 
         verticies.append(vertex)
 
-        curr_id = dbond["left_dbond_id"]
+        curr_id = dbond["dbond_left_id"]
 
     return verticies
 
@@ -101,7 +100,8 @@ def find_center(vertices):
 #     return real_sum, imaginary_sum
 
 
-def calc_order(vertices, n, use_reference=True):
+def calc_order(vertices, n, use_reference=False):
+    """DO NOT USE THIS FOR NEMATIC ORDER!!!!"""
     real_sum = 0.0
     imaginary_sum = 0.0
     center = find_center(vertices)
@@ -137,6 +137,27 @@ def calc_order(vertices, n, use_reference=True):
     imaginary_sum /= len(vertices)
 
     return real_sum, imaginary_sum
+
+
+def calc_nematic(vertices):
+    cos_part = 0.0
+    sin_part = 0.0
+    center = find_center(vertices)
+
+    points = np.array(
+        [[v["x_pos"] - center[0], v["y_pos"] - center[1]] for v in vertices],
+        dtype=np.float32,
+    )
+
+    covariance = np.cov(points, rowvar=False)
+    # Find principal axes
+    eigenvalues, eigenvectors = np.linalg.eigh(covariance)
+    # Eigenvector corresponding to largest eigenvalue
+    principal_axis = eigenvectors[:, np.argmax(eigenvalues)]
+
+    phi = np.arctan2(principal_axis[1], principal_axis[0])
+
+    return np.cos(2 * phi), np.sin(2 * phi)
 
 
 def calc_aspect_ratio(vertices):
@@ -201,7 +222,7 @@ def nematic_order_dict(cell_data, dbonds_data, vertices_data, use_reference=True
 
     for cell_id in cell_data["cell_id"].unique():
         vertices = get_cell_verticies(cell_id, dbonds_data, vertices_data)
-        n_order = calc_order(vertices, 2, use_reference)
+        n_order = calc_nematic(vertices)
 
         nematic_orders[cell_id] = n_order[0]  # real part
 

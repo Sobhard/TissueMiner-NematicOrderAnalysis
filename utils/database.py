@@ -7,7 +7,7 @@ import numpy as np
 
 
 def get_database_path():
-    return Path("data/demo.sqlite")
+    return Path("data/WT_25deg_111102.sqlite")
 
 
 def get_frame_count(database_path: Path):
@@ -30,6 +30,13 @@ def get_frame_count(database_path: Path):
 def get_frame(frame, database_path):
     """
     Load all data necessary to visualize one frame.
+
+    if the we are using WT:
+        ubond_id instead of bond_id
+        dbond_left_id instead of left_dbond_id
+        ubonds instead of bonds
+        dbonds instead of directed_bonds
+
     """
 
     conn = sqlite3.connect(database_path)
@@ -64,9 +71,9 @@ def get_frame(frame, database_path):
     bonds_query = """
         SELECT
             frame,
-            bond_id,
+            ubond_id,
             bond_length
-        FROM bonds
+        FROM ubonds
         WHERE frame = ?
     """
 
@@ -78,10 +85,10 @@ def get_frame(frame, database_path):
             cell_id,
             dbond_id,
             conj_dbond_id,
-            bond_id,
+            ubond_id,
             vertex_id,
-            left_dbond_id
-        FROM directed_bonds
+            dbond_left_id
+        FROM dbonds
         WHERE frame = ?
     """
 
