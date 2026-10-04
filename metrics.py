@@ -1,7 +1,7 @@
 """This code will evaluate metrics over all the frames of the database"""
 
 import utils.database as db
-from utils import cellmath, cellplot
+from utils import cellmath
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -49,12 +49,10 @@ if not index_path.exists():
         frame_data = db.get_frame(i, db.get_database_path())
 
         # Creating series in the CELLS dataframe for nematic roder, hexatic order, shoelace_area and aspect ratio
-        nematic_orders = cellmath.order_dict(
+        nematic_orders = cellmath.nematic_order_dict(
             frame_data[Tables.CELLS],
             frame_data[Tables.DBONDS],
             frame_data[Tables.VERTICES],
-            2,
-            use_reference=False,
         )
 
         hexatic_orders = cellmath.order_dict(
@@ -90,6 +88,8 @@ if not index_path.exists():
         ].map(omegas)
 
         tmp_index[i] = frame_data
+
+        print(f"done with frame {i}/{frame_count}")
 
     with open(index_path, "wb") as f:
         pickle.dump(tmp_index, f)
