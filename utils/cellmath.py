@@ -2,28 +2,85 @@
 
 import pandas as pd
 import numpy as np
+import time
 
 
-def get_cell_verticies(cell_id, dbonds_data, vertex_data):
-    cell_dbonds_data = dbonds_data[dbonds_data["cell_id"] == cell_id]
-    verticies = []
+def create_dbond_vertex_cache(dbonds_data, vertices_data):
+    """
+    Create fast lookup dictionaries for dbonds and vertices.
+
+    The cache contains:
+        dbond_by_id:
+            dbond_id -> dbond record
+
+        vertex_by_id:
+            vertex_id -> vertex record
+
+        start_dbond_by_cell:
+            cell_id -> first dbond_id belonging to that cell
+
+        cells_by_vertex:
+            vertex_id -> list of cell_ids touching that vertex
+
+        dbonds_by_vertex:
+            vertex_id -> list of dbond_ids touching that vertex
+
+    The cache should be created once per dataset/frame and reused.
+    """
+
+    cache = {
+        # Direct ID -> row lookups
+        "dbond_by_id": (dbonds_data.set_index("dbond_id").to_dict("index")),
+        "vertex_by_id": (vertices_data.set_index("vertex_id").to_dict("index")),
+        # One starting dbond for each cell
+        "start_dbond_by_cell": (
+            dbonds_data.groupby("cell_id")["dbond_id"].first().to_dict()
+        ),
+        # All cells touching each vertex
+        "cells_by_vertex": (
+            dbonds_data.groupby("vertex_id")["cell_id"].apply(list).to_dict()
+        ),
+        # All dbonds touching each vertex
+        "dbonds_by_vertex": (
+            dbonds_data.groupby("vertex_id")["dbond_id"].apply(list).to_dict()
+        ),
+    }
+
+    return cache
+
+
+def get_cell_vertices(cell_id, cache):
+
+    # start_time = time.perf_counter()
+
+    dbond_by_id = cache["dbond_by_id"]
+    vertex_by_id = cache["vertex_by_id"]
+    start_dbond_by_cell = cache["start_dbond_by_cell"]
+
+    curr_id = start_dbond_by_cell[cell_id]
+
+    vertices = []
     seen = set()
-    curr_id = cell_dbonds_data.iloc[0]["dbond_id"]
 
     while curr_id not in seen:
         seen.add(curr_id)
-        dbond = cell_dbonds_data[cell_dbonds_data["dbond_id"] == curr_id].iloc[0]
-        vertex = vertex_data[vertex_data["vertex_id"] == dbond["vertex_id"]].iloc[0]
 
-        verticies.append(vertex)
+        dbond = dbond_by_id[curr_id]
+        vertex = vertex_by_id[dbond["vertex_id"]]
+
+        vertices.append(vertex)
 
         curr_id = dbond["dbond_left_id"]
 
-    return verticies
+    # end_time = time.perf_counter()
+
+    # print(f"Getting cell vertices took {(end_time - start_time):.6f}s", end="\r")
+
+    return vertices
 
 
-def get_neighbors_cell(cell_id, dbonds_data, vertex_data):
-    verticies = get_cell_verticies(cell_id, dbonds_data, vertex_data)
+def get_neighbors_cell(cell_id, cache, dbonds_data):
+    verticies = get_cell_vertices(cell_id, cache)
     vertex_ids = pd.Series([v["vertex_id"] for v in verticies])
 
     neighbor_bonds = dbonds_data[dbonds_data["vertex_id"].isin(vertex_ids)]
@@ -73,6 +130,9 @@ def find_center(vertices):
         x_center += (x1 + x2) * cross
         y_center += (y1 + y2) * cross
 
+    if area == 0:
+        return None
+
     area /= 2
 
     x_center /= 6 * area
@@ -106,6 +166,9 @@ def calc_order(vertices, n, use_reference=False):
     imaginary_sum = 0.0
     center = find_center(vertices)
     reference_angle = 0
+
+    if not center:
+        return 0, 0
 
     # Center the vertices
     points = np.array(
@@ -144,6 +207,9 @@ def calc_nematic(vertices):
     sin_part = 0.0
     center = find_center(vertices)
 
+    if not center:
+        return 0, 0
+
     points = np.array(
         [[v["x_pos"] - center[0], v["y_pos"] - center[1]] for v in vertices],
         dtype=np.float32,
@@ -163,6 +229,8 @@ def calc_nematic(vertices):
 def calc_aspect_ratio(vertices):
 
     center = find_center(vertices)
+    if not center:
+        return 1
 
     # Center the vertices
     points = np.array(
@@ -205,11 +273,15 @@ def calc_aspect_ratio(vertices):
 #     return major / minor
 
 
-def order_dict(cell_data, dbonds_data, vertices_data, n, use_reference=True):
+def order_dict(cell_data, cache, n, use_reference=True):
     orders = {}
 
     for cell_id in cell_data["cell_id"].unique():
-        vertices = get_cell_verticies(cell_id, dbonds_data, vertices_data)
+        vertices = get_cell_vertices(cell_id, cache)
+        if len(vertices) < 3:
+            # print("ERROR NO VERTICES IN CELL", cell_id)
+            orders[cell_id] = 1
+            continue
         order = calc_order(vertices, n, use_reference)
 
         orders[cell_id] = order[0]  # real part
@@ -217,11 +289,16 @@ def order_dict(cell_data, dbonds_data, vertices_data, n, use_reference=True):
     return orders
 
 
-def nematic_order_dict(cell_data, dbonds_data, vertices_data, use_reference=True):
+def nematic_order_dict(cell_data, cache, use_reference=True):
     nematic_orders = {}
 
     for cell_id in cell_data["cell_id"].unique():
-        vertices = get_cell_verticies(cell_id, dbonds_data, vertices_data)
+        vertices = get_cell_vertices(cell_id, cache)
+        if len(vertices) < 3:
+            # print("ERROR NO VERTICES IN CELL", cell_id)
+            nematic_orders[cell_id] = 0
+            continue
+
         n_order = calc_nematic(vertices)
 
         nematic_orders[cell_id] = n_order[0]  # real part
@@ -241,13 +318,17 @@ def nematic_order_dict(cell_data, dbonds_data, vertices_data, use_reference=True
 #     return ellipse_ratios
 
 
-def aspect_ratio_dict(cell_data, dbonds_data, vertices_data):
+def aspect_ratio_dict(cell_data, cache):
 
     ellipse_ratios = {}
 
     for cell_id in cell_data["cell_id"].unique():
 
-        vertices = get_cell_verticies(cell_id, dbonds_data, vertices_data)
+        vertices = get_cell_vertices(cell_id, cache)
+        if len(vertices) < 3:
+            # print("ERROR NO VERTICES IN CELL", cell_id)
+            ellipse_ratios[cell_id] = 1
+            continue
         aspect_ratio = calc_aspect_ratio(vertices)
 
         ellipse_ratios[cell_id] = aspect_ratio
@@ -255,13 +336,16 @@ def aspect_ratio_dict(cell_data, dbonds_data, vertices_data):
     return ellipse_ratios
 
 
-def calc_local_hexatic_order(cell_id, dbonds_data, vertices_data):
+def calc_local_hexatic_order(cell_id, cache, dbonds_data):
     # Get this cell's vertices and center
-    vertices = get_cell_verticies(cell_id, dbonds_data, vertices_data)
+    vertices = get_cell_vertices(cell_id, cache)
     center = find_center(vertices)
 
+    if not center:
+        return 0
+
     # Get neighboring cells
-    neighbors = get_neighbors_cell(cell_id, dbonds_data, vertices_data)
+    neighbors = get_neighbors_cell(cell_id, cache, dbonds_data)
 
     # Remove this cell itself and duplicate neighbors
     neighbors = set(neighbors)
@@ -273,8 +357,11 @@ def calc_local_hexatic_order(cell_id, dbonds_data, vertices_data):
 
     for neighbor_id in neighbors:
         # Get neighbor's vertices and center
-        neighbor_vertices = get_cell_verticies(neighbor_id, dbonds_data, vertices_data)
+        neighbor_vertices = get_cell_vertices(neighbor_id, cache)
         neighbor_center = find_center(neighbor_vertices)
+
+        if not neighbor_center:
+            continue
 
         # Vector from this cell to its neighbor
         dx = neighbor_center[0] - center[0]
@@ -316,11 +403,11 @@ def weighted_order_dict(nematic_order_dict, aspect_ratio_dict):
     return weighted_order_dict
 
 
-def local_hexatic_order_dict(cell_data, dbonds_data, vertices_data):
+def local_hexatic_order_dict(cell_data, cache, dbonds_data):
     hexatic_orders = {}
 
     for cell_id in cell_data["cell_id"].unique():
-        hexatic_order = calc_local_hexatic_order(cell_id, dbonds_data, vertices_data)
+        hexatic_order = calc_local_hexatic_order(cell_id, cache, dbonds_data)
 
         hexatic_orders[cell_id] = hexatic_order
 

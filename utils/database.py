@@ -4,6 +4,8 @@ import sqlite3
 from pathlib import Path
 import pandas as pd
 import numpy as np
+from utils.cellmath import create_dbond_vertex_cache
+import time
 
 
 def get_database_path():
@@ -111,7 +113,7 @@ def get_timestamps(database_path):
     SELECT
         frame,
         time_sec
-    FROM frames
+    FROM timepoints
     """
 
     timestamps = pd.read_sql_query(timestamp_query, conn)
@@ -119,3 +121,82 @@ def get_timestamps(database_path):
     conn.close()
 
     return {"timestamps": timestamps}
+
+
+def create_database_cache(database_path: Path):
+    """
+    Create a global cache for the entire database.
+
+    Each frame gets its own cellmath cache containing:
+        - dbond_id -> dbond
+        - vertex_id -> vertex
+        - cell_id -> starting dbond
+        - vertex_id -> cells touching that vertex
+        - vertex_id -> dbonds touching that vertex
+
+    The resulting cache can be reused throughout the program so that
+    cellmath functions do not repeatedly perform pandas lookups.
+    """
+
+    start_time = time.perf_counter()
+
+    conn = sqlite3.connect(database_path)
+
+    # --------------------------------------------------------
+    # Load all vertices
+    # --------------------------------------------------------
+
+    vertices_query = """
+        SELECT
+            frame,
+            vertex_id,
+            x_pos,
+            y_pos
+        FROM vertices
+    """
+
+    vertices = pd.read_sql_query(vertices_query, conn)
+
+    # --------------------------------------------------------
+    # Load all directed bonds
+    # --------------------------------------------------------
+
+    dbonds_query = """
+        SELECT
+            frame,
+            cell_id,
+            dbond_id,
+            conj_dbond_id,
+            ubond_id,
+            vertex_id,
+            dbond_left_id
+        FROM dbonds
+    """
+
+    dbonds = pd.read_sql_query(dbonds_query, conn)
+
+    conn.close()
+
+    # --------------------------------------------------------
+    # Create a cellmath cache for each frame
+    # --------------------------------------------------------
+
+    database_cache = {}
+
+    for frame in sorted(dbonds["frame"].unique()):
+        print(f"Creating cache for frame {frame}/278...", end="\r")
+
+        frame_dbonds = dbonds[dbonds["frame"] == frame]
+
+        frame_vertices = vertices[vertices["frame"] == frame]
+
+        database_cache[frame] = create_dbond_vertex_cache(
+            frame_dbonds,
+            frame_vertices,
+        )
+
+    end_time = time.perf_counter()
+
+    print(f"Created databse cache in f{(end_time - start_time):.6f}s")
+
+    return database_cache

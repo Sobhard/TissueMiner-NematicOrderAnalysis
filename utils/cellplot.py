@@ -13,23 +13,25 @@ UNASSIGNED_CELL_ID = 10000
 
 
 def draw_cell_boundaries(
-    ax, frame: int, cell_id_list, hue_vals={}, border_width=0.8, negative_vals=True
+    ax,
+    frame: int,
+    cell_id_list,
+    hue_vals={},
+    omega_max=1,
+    border_width=0.8,
+    negative_vals=True,
 ):
     cell_data = db.get_frame(frame, db.get_database_path())
     all_dbonds = cell_data["directed_bonds"]
     all_vertices = cell_data["vertices"]
-
-    if hue_vals:
-        omega_max = calcMax(hue_vals)
-    else:
-        omega_max = 1
+    cache = cellmath.create_dbond_vertex_cache(all_dbonds, all_vertices)
 
     for cell_id in cell_id_list:
 
         if cell_id == UNASSIGNED_CELL_ID:
             continue
 
-        cell_verticies = cellmath.get_cell_verticies(cell_id, all_dbonds, all_vertices)
+        cell_verticies = cellmath.get_cell_vertices(cell_id, cache)
         cell_points = [(v["x_pos"], v["y_pos"]) for v in cell_verticies]
 
         if len(cell_points) < 3:
