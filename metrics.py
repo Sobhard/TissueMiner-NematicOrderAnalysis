@@ -99,6 +99,7 @@ if not index_path.exists():
     with open(index_path, "wb") as f:
         pickle.dump(tmp_index, f)
 
+
 index: dict[int, pd.DataFrame] = pd.read_pickle(index_path)
 timestamps: pd.Series = db.get_timestamps(db.get_database_path())["timestamps"][
     "time_sec"
@@ -139,8 +140,8 @@ for frame_data in index.values():
 
     aspect_ratios = aspect_ratios[(aspect_ratios >= lower) & (aspect_ratios <= upper)]
 
-    # if len(eliminated_vals) > 0:
-    #     print(f"Eliminated aspect ratio values: {eliminated_vals}")
+    if len(eliminated_vals) > 0:
+        print(f"Eliminated aspect ratio values: {eliminated_vals}")
 
     mean_aspect = np.mean(aspect_ratios)
     average_aspect_ratios.append(mean_aspect)
@@ -189,8 +190,7 @@ for frame_data in index.values():
 
 fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 8), sharex=True)
 
-print(average_nematic_orders[-5:])
-print(timestamps[-5:])
+frame_counts = range(len(index.values()))
 
 # --- Nematic Order ---
 ax1.plot(timestamps, average_nematic_orders)
