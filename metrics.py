@@ -1,41 +1,14 @@
 """This code will evaluate metrics over all the frames of the database"""
 
 import utils.database as db
+from utils.database import Tables, SeriesKeys
 from utils import cellmath
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import pickle
-from enum import StrEnum
 from pathlib import Path
 import time
-
-
-class Tables(StrEnum):
-    CELLS = "cells"
-    VERTICES = "vertices"
-    BONDS = "bonds"
-    DBONDS = "directed_bonds"
-
-
-class SeriesKeys(StrEnum):
-    CELL_ID = "cell_id"
-    CENTER_X = "center_x"
-    CENTER_Y = "center_y"
-    AREA = "area"
-    ELONG_XX = "elong_xx"
-    ELONG_XY = "elong_xy"
-    VERTEX_ID = "vertex_id"
-    X = "x_pos"
-    Y = "y_pos"
-    BOND_ID = "bond_id"
-    BOND_LENGTH = "bond_length"
-    DBOND_ID = "dbond_id"
-    ASPECT_RATIO = "aspect_ratio"
-    NEMATIC_ORDER = "nematic_order"
-    HEXATIC_ORDER = "hexatic_order"
-    OMEGA = "weighted_nematic_order"
-
 
 # Agregate frame data into a .pkl file for easy analytics
 index_path = Path(f"indices/{str(db.get_database_path())[5:-7]}.pkl")
