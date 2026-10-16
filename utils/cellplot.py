@@ -1,11 +1,9 @@
 """Generates visualizations of cells from the cell database"""
 
-from matplotlib.cm import ScalarMappable
-
 import utils.database as db
 import utils.cellmath as cellmath
+from utils.color_formatter import color_formatter
 import numpy as np
-from matplotlib.colors import Normalize
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 
@@ -14,17 +12,22 @@ UNASSIGNED_CELL_ID = 10000
 
 def draw_cell_boundaries(
     ax,
+    fig,
+    color_bar_label,
     frame: int,
     cell_id_list,
     hue_vals={},
     omega_max=1,
+    omega_min=0,
     border_width=0.8,
-    negative_vals=True,
+    do_normalization=True,
 ):
     cell_data = db.get_frame(frame, db.get_database_path())
     all_dbonds = cell_data["directed_bonds"]
     all_vertices = cell_data["vertices"]
     cache = cellmath.create_dbond_vertex_cache(all_dbonds, all_vertices)
+
+    colors = color_formatter(omega_max, omega_min)
 
     for cell_id in cell_id_list:
 
@@ -43,7 +46,7 @@ def draw_cell_boundaries(
         if np.isnan(omega):
             facecolor = "lightgray"
         else:
-            facecolor = getColor(omega, omega_max, negatives=negative_vals)
+            facecolor = colors.getColor(omega)
 
         polygon = Polygon(
             cell_points,
@@ -57,38 +60,7 @@ def draw_cell_boundaries(
         ax.autoscale()
         ax.set_aspect("equal")
 
-
-def calcMax(vals: dict):
-    return np.nanmax(np.abs(np.array(list(vals.values()), dtype=np.float32)))
-
-
-def getColor(val, max_val, cmap_color="coolwarm", negatives=True):
-    if negatives:
-        norm = Normalize(-max_val, max_val)
-    else:
-        norm = Normalize(0, max_val)
-
-    cmap = plt.get_cmap(cmap_color)
-
-    return cmap(norm(val))
-
-
-def plotColorBar(
-    ax, fig, hue_vals: dict, negatives: bool, label, cmap_color="coolwarm"
-):
-    max_val = calcMax(hue_vals)
-    cmap = plt.get_cmap(cmap_color)
-
-    if negatives:
-        norm = Normalize(-max_val, max_val)
-    else:
-        norm = Normalize(0, max_val)
-
-    scalar_mappable = ScalarMappable(norm=norm, cmap=cmap)
-
-    scalar_mappable.set_array(list(hue_vals.values()))
-    colorbar = fig.colorbar(scalar_mappable, ax=ax, fraction=0.046, pad=0.04)
-    colorbar.set_label(label)
+    colors.plotColorbar(ax, fig, color_bar_label)
 
 
 if __name__ == "__main__":
@@ -97,12 +69,12 @@ if __name__ == "__main__":
     fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2)
     cellsListAx1 = cellmath.get_neighbors_vertex(2050, data["directed_bonds"])
     ax1.set_title("Cells at Vertex 2050")
-    draw_cell_boundaries(ax1, 1, cellsListAx1)
+    draw_cell_boundaries(ax1, fig, "No colors needed", 1, cellsListAx1)
 
     ax2.set_title("Cells bordering cell 10203")
     cellsListAx2 = cellmath.get_neighbors_cell(
         10203, data["directed_bonds"], data["vertices"]
     )
-    draw_cell_boundaries(ax2, 1, cellsListAx2)
+    draw_cell_boundaries(ax2, fig, "No colors needed", 1, cellsListAx2)
 
     plt.show()

@@ -6,6 +6,33 @@ import pandas as pd
 import numpy as np
 from utils.cellmath import create_dbond_vertex_cache
 import time
+from enum import StrEnum
+
+
+class Tables(StrEnum):
+    CELLS = "cells"
+    VERTICES = "vertices"
+    BONDS = "bonds"
+    DBONDS = "directed_bonds"
+
+
+class SeriesKeys(StrEnum):
+    CELL_ID = "cell_id"
+    CENTER_X = "center_x"
+    CENTER_Y = "center_y"
+    AREA = "area"
+    ELONG_XX = "elong_xx"
+    ELONG_XY = "elong_xy"
+    VERTEX_ID = "vertex_id"
+    X = "x_pos"
+    Y = "y_pos"
+    BOND_ID = "bond_id"
+    BOND_LENGTH = "bond_length"
+    DBOND_ID = "dbond_id"
+    ASPECT_RATIO = "aspect_ratio"
+    NEMATIC_ORDER = "nematic_order"
+    HEXATIC_ORDER = "hexatic_order"
+    OMEGA = "weighted_nematic_order"
 
 
 def get_database_path():
