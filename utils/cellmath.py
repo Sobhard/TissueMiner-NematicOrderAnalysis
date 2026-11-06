@@ -391,14 +391,51 @@ def calc_local_hexatic_order(cell_id, cache, dbonds_data):
     return np.sqrt(real_sum**2 + imaginary_sum**2)
 
 
-def weighted_order_dict(nematic_order_dict, aspect_ratio_dict):
-    avg_aspect_ratio = np.mean(list(aspect_ratio_dict.values()))
+# def weighted_order_dict(nematic_order_dict, aspect_ratio_dict):
+
+
+#     avg_aspect_ratio = np.mean(list(aspect_ratio_dict.values()))
+#     weighted_order_dict = dict()
+
+#     for cell_id, n_order in nematic_order_dict.items():
+#         weighted_order_dict[cell_id] = (
+#             aspect_ratio_dict[cell_id] * n_order / avg_aspect_ratio
+#         )
+
+#     return weighted_order_dict
+
+
+def weighted_order_dict(nematic_order_dict, aspect_ratio_dict, iqr_multiplier=15):
+    """Weight each cell's nematic order by its aspect ratio relative to the mean.
+
+    Aspect ratios more than `iqr_multiplier` * IQR above Q3 are treated as
+    outliers: they're excluded from the average, and those cells get NaN.
+    """
+    # Keep only finite aspect ratios
+    valid = {
+        cell_id: ar
+        for cell_id, ar in aspect_ratio_dict.items()
+        if ar is not None and np.isfinite(ar)
+    }
+
     weighted_order_dict = dict()
+    if not valid:
+        return {cell_id: np.nan for cell_id in nematic_order_dict}
+
+    values = np.fromiter(valid.values(), dtype=float)
+    q1, q3 = np.percentile(values, [25, 75])
+    upper = q3 + iqr_multiplier * (q3 - q1)
+
+    # Drop outliers above the upper bound
+    cleaned = {cell_id: ar for cell_id, ar in valid.items() if ar <= upper}
+    avg_aspect_ratio = np.mean(list(cleaned.values()))
 
     for cell_id, n_order in nematic_order_dict.items():
-        weighted_order_dict[cell_id] = (
-            aspect_ratio_dict[cell_id] * n_order / avg_aspect_ratio
-        )
+        ar = cleaned.get(cell_id)
+        if ar is None or avg_aspect_ratio == 0:
+            weighted_order_dict[cell_id] = np.nan
+        else:
+            weighted_order_dict[cell_id] = ar * n_order / avg_aspect_ratio
 
     return weighted_order_dict
 
