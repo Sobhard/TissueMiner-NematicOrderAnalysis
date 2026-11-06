@@ -20,7 +20,7 @@ from utils.database import Tables, SeriesKeys
 # Settings
 # ---------------------------------------------------------------------------
 HISTOGRAM_INTERVAL = 1  # make a histogram every N frames
-N_BINS = 30
+N_BINS = 35
 OUTPUT_DIR = Path("histograms")
 
 # Each metric: (series key, title, x-axis label, skip first row, remove IQR outliers)
@@ -75,7 +75,7 @@ def clean_values(cells: pd.DataFrame, key, skip_first: bool, remove_outliers: bo
     if remove_outliers and len(values) > 0:
         q1, q3 = np.percentile(values, [25, 75])
         iqr = q3 - q1
-        lower, upper = q1 - 1.5 * iqr, q3 + 1.5 * iqr
+        lower, upper = q1 - 15 * iqr, q3 + 1.5 * iqr
         values = values[(values >= lower) & (values <= upper)]
 
     return values
