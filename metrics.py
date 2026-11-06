@@ -106,8 +106,8 @@ for frame_data in index.values():
     q3 = np.percentile(aspect_ratios, 75)
     iqr = q3 - q1
 
-    lower = q1 - 1.5 * iqr
-    upper = q3 + 1.5 * iqr
+    lower = q1 - 15 * iqr
+    upper = q3 + 15 * iqr
 
     eliminated_vals = aspect_ratios[(aspect_ratios < lower) | (aspect_ratios > upper)]
 
